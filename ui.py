@@ -2,12 +2,16 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 import threading
 import copy_playlists
+import google_test
 
 class Spotify2YTMUI(tk.Tk):
     def __init__(self):
+        # Initialise Youtube
+        self.youtube = google_test.load()
+
         super().__init__()
         self.title("Spotify ➡️ YouTube Music Playlist Copier")
-        self.geometry("700x800")
+        self.geometry("1280x720")
         self.resizable(True, True)
         self.configure(bg='#1e1e1e')
         
@@ -72,21 +76,34 @@ class Spotify2YTMUI(tk.Tk):
                                  bg='#1e1e1e')
         subtitle_label.pack(pady=(0, 20))
 
-        # Notebook with custom style
-        self.notebook = ttk.Notebook(main_frame, style='Custom.TNotebook')
-        self.notebook.pack(fill="both", expand=True, pady=(0, 15))
+        # --- Place Spotify and YouTube notebooks side by side ---
+        notebooks_frame = tk.Frame(main_frame, bg='#1e1e1e')
+        notebooks_frame.pack(fill="both", expand=True, pady=(0, 15))
 
-        self.playlists_tab = ttk.Frame(self.notebook, style='Custom.TFrame')
-        self.liked_tab = ttk.Frame(self.notebook, style='Custom.TFrame')
-        self.artists_tab = ttk.Frame(self.notebook, style='Custom.TFrame')
+        # Spotify Notebook (left)
+        self.spotify_notebook = ttk.Notebook(notebooks_frame, style='Custom.TNotebook')
+        self.spotify_notebook.pack(side="left", fill="both", expand=True, padx=(0, 7))
 
-        self.notebook.add(self.playlists_tab, text="🎵 Playlists")
-        self.notebook.add(self.liked_tab, text="❤️ Liked Songs")
-        self.notebook.add(self.artists_tab, text="👤 Artists")
+        self.spotify_playlists_tab = ttk.Frame(self.spotify_notebook, style='Custom.TFrame')
+        self.spotify_liked_tab = ttk.Frame(self.spotify_notebook, style='Custom.TFrame')
+        self.spotify_artists_tab = ttk.Frame(self.spotify_notebook, style='Custom.TFrame')
 
-        self.create_playlists_tab()
-        self.create_liked_tab()
-        self.create_artists_tab()
+        self.spotify_notebook.add(self.spotify_playlists_tab, text="🎵 Playlists")
+        self.spotify_notebook.add(self.spotify_liked_tab, text="❤️ Liked Songs")
+        self.spotify_notebook.add(self.spotify_artists_tab, text="👤 Artists")
+
+        self.create_spotify_playlists_tab()
+        self.create_spotify_liked_tab()
+        self.create_spotify_artists_tab()
+
+        # Youtube Notebook (right)
+        self.youtube_notebook = ttk.Notebook(notebooks_frame, style='Custom.TNotebook')
+        self.youtube_notebook.pack(side="left", fill="both", expand=True, padx=(7, 0))
+
+        self.youtube_playlists_tab = ttk.Frame(self.youtube_notebook, style='Custom.TFrame')
+        self.youtube_notebook.add(self.youtube_playlists_tab, text="🎵 Playlists")
+
+        self.create_youtube_playlists_tab()
 
         # Status section
         status_frame = tk.Frame(main_frame, bg='#2d2d2d', relief='flat', bd=1)
@@ -168,9 +185,9 @@ class Spotify2YTMUI(tk.Tk):
         self.response_text.delete(1.0, tk.END)
         self.response_text.config(state="disabled")
 
-    def create_playlists_tab(self):
+    def create_spotify_playlists_tab(self):
         # Main container for playlists tab
-        container = tk.Frame(self.playlists_tab, bg='#1e1e1e')
+        container = tk.Frame(self.spotify_playlists_tab, bg='#1e1e1e')
         container.pack(fill="both", expand=True, padx=20, pady=20)
 
         # Instructions
@@ -185,8 +202,8 @@ class Spotify2YTMUI(tk.Tk):
         listbox_frame = tk.Frame(container, bg='#2d2d2d', relief='flat', bd=1)
         listbox_frame.pack(fill="both", expand=True, pady=(0, 15))
 
-        self.playlists_listbox = tk.Listbox(listbox_frame,
-                                          selectmode=tk.MULTIPLE,
+        self.spotify_playlists_listbox = tk.Listbox(listbox_frame,
+                                          selectmode=tk.SINGLE,
                                           bg='#2d2d2d',
                                           fg='white',
                                           font=('Segoe UI', 10),
@@ -196,10 +213,10 @@ class Spotify2YTMUI(tk.Tk):
                                           bd=0,
                                           highlightthickness=0)
         
-        listbox_scrollbar = ttk.Scrollbar(listbox_frame, orient="vertical", command=self.playlists_listbox.yview)
-        self.playlists_listbox.configure(yscrollcommand=listbox_scrollbar.set)
+        listbox_scrollbar = ttk.Scrollbar(listbox_frame, orient="vertical", command=self.spotify_playlists_listbox.yview)
+        self.spotify_playlists_listbox.configure(yscrollcommand=listbox_scrollbar.set)
         
-        self.playlists_listbox.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+        self.spotify_playlists_listbox.pack(side="left", fill="both", expand=True, padx=10, pady=10)
         listbox_scrollbar.pack(side="right", fill="y", pady=10)
 
         # Button frame
@@ -208,7 +225,7 @@ class Spotify2YTMUI(tk.Tk):
 
         ttk.Button(btn_frame, 
                   text="🔄 Load Playlists", 
-                  command=self.load_playlists,
+                  command=self.load_spotify_playlists,
                   style='Custom.TButton').pack(side="left", padx=(0, 10))
 
         ttk.Button(btn_frame, 
@@ -221,8 +238,8 @@ class Spotify2YTMUI(tk.Tk):
                   command=self.copy_all_playlists,
                   style='Green.TButton').pack(side="left")
 
-    def create_liked_tab(self):
-        container = tk.Frame(self.liked_tab, bg='#1e1e1e')
+    def create_spotify_liked_tab(self):
+        container = tk.Frame(self.spotify_liked_tab, bg='#1e1e1e')
         container.pack(expand=True)
 
         # Icon and description
@@ -249,8 +266,8 @@ class Spotify2YTMUI(tk.Tk):
                   command=self.copy_liked_songs,
                   style='Green.TButton').pack()
 
-    def create_artists_tab(self):
-        container = tk.Frame(self.artists_tab, bg='#1e1e1e')
+    def create_spotify_artists_tab(self):
+        container = tk.Frame(self.spotify_artists_tab, bg='#1e1e1e')
         container.pack(expand=True)
 
         # Icon and description
@@ -276,20 +293,78 @@ class Spotify2YTMUI(tk.Tk):
                   text="👥 Follow Artists",
                   command=self.copy_followed_artists,
                   style='Green.TButton').pack()
+        
+    def create_youtube_playlists_tab(self):
+        # Main container for playlists tab
+        container = tk.Frame(self.youtube_playlists_tab, bg='#1e1e1e')
+        container.pack(fill="both", expand=True, padx=20, pady=20)
 
-    def load_playlists(self):
-        self.playlists_listbox.delete(0, tk.END)
+        # Instructions
+        instruction_label = tk.Label(container,
+                                   text="Select the playlist to transfer to",
+                                   font=('Segoe UI', 11),
+                                   fg='#cccccc',
+                                   bg='#1e1e1e')
+        instruction_label.pack(pady=(0, 15))
+
+        # Listbox with modern styling
+        listbox_frame = tk.Frame(container, bg='#2d2d2d', relief='flat', bd=1)
+        listbox_frame.pack(fill="both", expand=True, pady=(0, 15))
+
+        self.youtube_playlists_listbox = tk.Listbox(listbox_frame,
+                                          selectmode=tk.SINGLE,
+                                          bg='#2d2d2d',
+                                          fg='white',
+                                          font=('Segoe UI', 10),
+                                          selectbackground='#0078d4',
+                                          selectforeground='white',
+                                          relief='flat',
+                                          bd=0,
+                                          highlightthickness=0)
+        
+        listbox_scrollbar = ttk.Scrollbar(listbox_frame, orient="vertical", command=self.youtube_playlists_listbox.yview)
+        self.youtube_playlists_listbox.configure(yscrollcommand=listbox_scrollbar.set)
+        
+        self.youtube_playlists_listbox.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+        listbox_scrollbar.pack(side="right", fill="y", pady=10)
+
+        # Button frame
+        btn_frame = tk.Frame(container, bg='#1e1e1e')
+        btn_frame.pack(fill="x")
+
+        ttk.Button(btn_frame, 
+                  text="🔄 Load Playlists", 
+                  command=self.load_youtube_playlists,
+                  style='Custom.TButton').pack(side="left", padx=(0, 10))
+
+    def load_spotify_playlists(self):
+        self.spotify_playlists_listbox.delete(0, tk.END)
         self.progress.set("Loading playlists from Spotify...")
-        self.playlists = copy_playlists.list_spotify_playlists()
-        for idx, playlist in enumerate(self.playlists):
+        self.spotify_playlists = copy_playlists.list_spotify_playlists()
+        for idx, playlist in enumerate(self.spotify_playlists):
             name = playlist['name']
             total = playlist['tracks']['total'] if 'tracks' in playlist and 'total' in playlist['tracks'] else "?"
-            self.playlists_listbox.insert(tk.END, f"🎵 {name} ({total} tracks)")
+            self.spotify_playlists_listbox.insert(tk.END, f"🎵 {name} ({total} tracks)")
         self.append_response("✅ Loaded playlists successfully")
-        self.progress.set(f"Loaded {len(self.playlists)} playlists")
+        self.progress.set(f"Loaded {len(self.spotify_playlists)} playlists")
+
+    def load_youtube_playlists(self):
+        self.youtube_playlists_listbox.delete(0, tk.END)
+        self.progress.set("Loading playlists from Youtube...")
+        self.youtube_playlists = google_test.get_playlists(self.youtube)
+        for idx, playlist in enumerate(self.youtube_playlists):
+            name = playlist['snippet']['title']
+            total = (
+                playlist['contentDetails']['itemCount']
+                if 'contentDetails' in playlist and 'itemCount' in playlist['contentDetails']
+                else "?"
+            )
+            self.youtube_playlists_listbox.insert(tk.END, f"🎵 {name} ({total} tracks)")
+        self.append_response("✅ Loaded playlists successfully")
+        self.progress.set(f"Loaded {len(self.youtube_playlists)} playlists")
 
     def copy_selected_playlists(self):
-        selected = self.playlists_listbox.curselection()
+        selected = self.spotify_playlists_listbox.curselection()
         if not selected:
             messagebox.showinfo("No Selection", "Please select at least one playlist.")
             return

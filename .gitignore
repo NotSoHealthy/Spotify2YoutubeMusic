@@ -6,6 +6,7 @@ ENV/
 .venv
 .git/
 .git
+.env
 
 # Python cache files
 __pycache__/
@@ -47,3 +48,6 @@ MANIFEST
 
 # Project related files
 browser.json
+
+#Google oauth credentials
+token.json
