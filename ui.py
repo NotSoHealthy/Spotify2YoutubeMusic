@@ -7,7 +7,7 @@ import google_test
 class Spotify2YTMUI(tk.Tk):
     def __init__(self):
         # Initialise Youtube
-        self.youtube = google_test.load()
+        self.youtube = None
 
         super().__init__()
         self.title("Spotify ➡️ YouTube Music Playlist Copier")
@@ -211,7 +211,8 @@ class Spotify2YTMUI(tk.Tk):
                                           selectforeground='white',
                                           relief='flat',
                                           bd=0,
-                                          highlightthickness=0)
+                                          highlightthickness=0,
+                                          exportselection=False)
         
         listbox_scrollbar = ttk.Scrollbar(listbox_frame, orient="vertical", command=self.spotify_playlists_listbox.yview)
         self.spotify_playlists_listbox.configure(yscrollcommand=listbox_scrollbar.set)
@@ -320,7 +321,8 @@ class Spotify2YTMUI(tk.Tk):
                                           selectforeground='white',
                                           relief='flat',
                                           bd=0,
-                                          highlightthickness=0)
+                                          highlightthickness=0,
+                                          exportselection=False)
         
         listbox_scrollbar = ttk.Scrollbar(listbox_frame, orient="vertical", command=self.youtube_playlists_listbox.yview)
         self.youtube_playlists_listbox.configure(yscrollcommand=listbox_scrollbar.set)
@@ -349,6 +351,9 @@ class Spotify2YTMUI(tk.Tk):
         self.progress.set(f"Loaded {len(self.spotify_playlists)} playlists")
 
     def load_youtube_playlists(self):
+        if not self.youtube:
+            self.youtube = google_test.load()
+        
         self.youtube_playlists_listbox.delete(0, tk.END)
         self.progress.set("Loading playlists from Youtube...")
         self.youtube_playlists = google_test.get_playlists(self.youtube)
@@ -364,17 +369,74 @@ class Spotify2YTMUI(tk.Tk):
         self.progress.set(f"Loaded {len(self.youtube_playlists)} playlists")
 
     def copy_selected_playlists(self):
-        selected = self.spotify_playlists_listbox.curselection()
-        if not selected:
-            messagebox.showinfo("No Selection", "Please select at least one playlist.")
+        spotify_index = self.spotify_playlists_listbox.curselection()
+        youtube_index = self.youtube_playlists_listbox.curselection()
+        if not spotify_index:
+            messagebox.showinfo("No Selection", "Please select a spotify playlist.")
             return
-        playlists = [self.playlists[i] for i in selected]
-        threading.Thread(target=self._copy_playlists, args=(playlists,)).start()
+        if not youtube_index:
+            messagebox.showinfo("No Selection", "Please select a youtube playlist.")
+            return
+        
+        spotify_playlist = self.spotify_playlists[spotify_index[0]]
+        youtube_playlist = self.youtube_playlists[youtube_index[0]]
+        print(spotify_playlist)
+        print(youtube_playlist)
+        
+        threading.Thread(target=self._new_copy_playlists, args=(spotify_playlist, youtube_playlist,)).start()
 
     def copy_all_playlists(self):
         if not hasattr(self, "playlists"):
             self.load_playlists()
         threading.Thread(target=self._copy_playlists, args=(self.playlists,)).start()
+        
+    def _new_copy_playlists(self, spotify_playlist, youtube_playlist):
+        spotify_playlist_name = spotify_playlist['name']
+        spotify_playlist_id = spotify_playlist['id']
+        youtube_playlist_id = youtube_playlist['id']
+        youtube_playlist_name = youtube_playlist['snippet']['title']
+        self.progress.set(f"Processing: {spotify_playlist_name}")
+        self.append_response(f"🎵 Processing playlist: {spotify_playlist_name}")
+        tracks = copy_playlists.get_spotify_playlist_tracks(spotify_playlist_id)
+        if not tracks:
+            self.append_response(f"⚠️ No tracks found in playlist: {spotify_playlist_name}")
+            return
+
+        ytm_video_ids = []
+        not_found_tracks = []
+        existing_video_ids = [
+            item["snippet"]["resourceId"]["videoId"]
+            for item in google_test.get_videos_in_playlist(self.youtube, youtube_playlist_id)
+            if "snippet" in item and "resourceId" in item["snippet"] and "videoId" in item["snippet"]["resourceId"]
+        ]
+
+        self.progressbar["maximum"] = len(tracks)
+        self.progressbar["value"] = 0
+
+        for idx, track in enumerate(tracks, 1):
+            video_id = copy_playlists.search_track_on_ytm(track)
+            if video_id and video_id not in existing_video_ids:
+                ytm_video_ids.append(video_id)
+            elif not video_id:
+                not_found_tracks.append(track)
+            self.progressbar["value"] = idx
+            self.progress.set(f"Searching: {idx}/{len(tracks)} - {track[:50]}...")
+            self.update_idletasks()
+
+        self.progressbar["value"] = 0
+
+        if ytm_video_ids:
+            google_test.add_videos_to_playlist(self.youtube, youtube_playlist_id, ytm_video_ids)
+            self.append_response(f"✅ Added {len(ytm_video_ids)} new tracks to: {youtube_playlist_name}")
+        else:
+            self.append_response(f"ℹ️ No new tracks to add for: {youtube_playlist_name}")
+        
+        if not_found_tracks:
+            self.append_response(f"⚠️ {len(not_found_tracks)} tracks not found on YouTube Music")
+            
+        self.progress.set("✅ Playlist transfer completed")
+        self.append_response("🎉 Finished copying all playlists!")
+        messagebox.showinfo("Success", "Playlists transferred successfully!")
 
     def _copy_playlists(self, playlists):
         for playlist in playlists:

@@ -10,7 +10,6 @@ load_dotenv()
 
 client_id = os.getenv("GOOGLE_CLIENT_ID")
 client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
-print(client_secret)
 
 # Scopes define the access level
 SCOPES = ["https://www.googleapis.com/auth/youtube"]
@@ -81,7 +80,7 @@ def get_playlists(youtube):
         response = request.execute()
 
         for playlist in response.get("items", []):
-            print(f"{playlist['snippet']['title']} ({playlist['id']})")
+            # print(f"{playlist['snippet']['title']} ({playlist['id']})")
             playlists.append(playlist)
 
         next_page_token = response.get('nextPageToken')
@@ -96,7 +95,7 @@ def get_videos_in_playlist(youtube, playlist_id):
 
     while True:
         request = youtube.playlistItems().list(
-            part="snippet",
+            part="id,snippet,contentDetails",
             maxResults=50,
             pageToken=next_page_token,
             playlistId=playlist_id,
@@ -104,9 +103,9 @@ def get_videos_in_playlist(youtube, playlist_id):
         response = request.execute()
 
         for item in response.get("items", []):
-            title = item["snippet"]["title"]
-            video_id = item["snippet"]["resourceId"]["videoId"]
-            print(f"{title}: https://www.youtube.com/watch?v={video_id}")
+            # title = item["snippet"]["title"]
+            # video_id = item["snippet"]["resourceId"]["videoId"]
+            # print(f"{title}: https://www.youtube.com/watch?v={video_id}")
             video_ids.append(item)
 
         next_page_token = response.get("nextPageToken")
