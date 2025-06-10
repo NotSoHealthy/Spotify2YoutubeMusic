@@ -51,3 +51,5 @@ browser.json
 
 #Google oauth credentials
 token.json
+
+config.json
