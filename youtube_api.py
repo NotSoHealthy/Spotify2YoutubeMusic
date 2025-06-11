@@ -5,6 +5,7 @@ import googleapiclient.discovery
 import google.auth.transport.requests
 from google.oauth2.credentials import Credentials
 from copy_playlists import *
+import yt_dlp
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -145,7 +146,29 @@ def create_playlist(youtube, playlist_name):
     )
 
     response = request.execute()
-    print(response)
+    
+def find_song(track_query):
+    ydl_opts = {
+        'quiet': True,
+        'skip_download': True,
+        'extract_flat': 'in_playlist',
+    }
+
+    search_query = f"ytsearch{1}:{track_query}"
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(search_query, download=False)
+        if 'entries' in info and info['entries']:
+            return info['entries'][0].get('id')
+        else:
+            return None
+        
+def delete_playlist(youtube, playlist_id):
+    request = youtube.playlists().delete(
+        id=playlist_id
+    )
+    print(request.execute())
+
 
 def load():
     creds = None
@@ -156,7 +179,8 @@ def load():
 
 def main():
     youtube = load()
-    print(get_playlists(youtube))
+    print(delete_playlist())
+    # print(get_playlists(youtube))
     # get_videos_in_playlist(youtube, 'PLMMjwcqXrl7m2VJgo6leEqtVLKooY6qSz')
     # create_playlist(youtube, 'test')
     # add_videos_to_playlist(youtube, 'PLMMjwcqXrl7krKY4YuVViNGFW8R0l5xRh', ['EyR2-C9ggi0'])

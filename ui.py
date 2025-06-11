@@ -1,10 +1,11 @@
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox, ttk, simpledialog, Listbox
 import threading
 import copy_playlists
-import google_test
+import youtube_api
 import json
 import os
+import time
 
 def load_config():
     if os.path.exists("config.json"):
@@ -323,7 +324,7 @@ class Spotify2YTMUI(tk.Tk):
         self.config_data = load_config()
         
         self.title("Spotify ➡️ YouTube Music Playlist Copier")
-        self.geometry("1280x720")
+        self.geometry("1600x900")
         self.resizable(True, True)
         self.configure(bg='#1e1e1e')
         
@@ -485,6 +486,27 @@ class Spotify2YTMUI(tk.Tk):
         self.response_text.pack(side="left", fill="both", expand=True, padx=10, pady=10)
         scrollbar.pack(side="right", fill="y", pady=10)
 
+        # Youtube playlist context menu
+        self.youtube_popup_menu = tk.Menu(self, tearoff=0)
+        self.youtube_popup_menu.add_command(label="Clear",
+                                    command=self.clear_youtube_playlist)
+        self.youtube_popup_menu.add_command(label="Delete",
+                                    command=self.delete_youtube_playlist)
+        
+              
+    def youtube_popup(self, event):
+        # Get the index of the item under the mouse
+        widget = event.widget
+        index = widget.nearest(event.y)
+        if index >= 0:
+            widget.selection_clear(0, tk.END)
+            widget.selection_set(index)
+            widget.activate(index)
+            self.youtube_selected_index = index  # Store for later use
+            try:
+                self.youtube_popup_menu.tk_popup(event.x_root, event.y_root, 0)
+            finally:
+                self.youtube_popup_menu.grab_release()
 
     def create_batch_size_section(self, parent):
         frame = tk.LabelFrame(parent, text="Batch Size", bg='#2d2d2d', fg='white', font=('Segoe UI', 11, 'bold'))
@@ -567,7 +589,7 @@ class Spotify2YTMUI(tk.Tk):
         container.pack(fill="both", expand=True, padx=20, pady=20)
 
         instruction_label = tk.Label(container,
-                                   text="Select playlists to transfer from Spotify to YouTube Music",
+                                   text="Select the Spotify playlist to transfer",
                                    font=('Segoe UI', 11),
                                    fg='#cccccc',
                                    bg='#1e1e1e')
@@ -699,6 +721,7 @@ class Spotify2YTMUI(tk.Tk):
         self.youtube_playlists_listbox.configure(yscrollcommand=listbox_scrollbar.set)
         
         self.youtube_playlists_listbox.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+        self.youtube_playlists_listbox.bind("<Button-3>", self.youtube_popup)
         listbox_scrollbar.pack(side="right", fill="y", pady=10)
 
         # Button frame
@@ -709,6 +732,11 @@ class Spotify2YTMUI(tk.Tk):
                   text="🔄 Load Playlists", 
                   command=self.load_youtube_playlists,
                   style='Custom.TButton').pack(side="left", padx=(0, 10))
+        
+        ttk.Button(btn_frame, 
+                  text="➕ New Playlist", 
+                  command=self.new_youtube_playlist,
+                  style='Green.TButton').pack(side="left", padx=(0, 10))
 
     def load_spotify_playlists(self):
         if not self.check_configuration():
@@ -725,11 +753,11 @@ class Spotify2YTMUI(tk.Tk):
 
     def load_youtube_playlists(self):
         if not self.youtube:
-            self.youtube = google_test.load()
+            self.youtube = youtube_api.load()
         
         self.youtube_playlists_listbox.delete(0, tk.END)
         self.progress.set("Loading playlists from Youtube...")
-        self.youtube_playlists = google_test.get_playlists(self.youtube)
+        self.youtube_playlists = youtube_api.get_playlists(self.youtube)
         for idx, playlist in enumerate(self.youtube_playlists):
             name = playlist['snippet']['title']
             total = (
@@ -781,7 +809,7 @@ class Spotify2YTMUI(tk.Tk):
         not_found_tracks = []
         existing_video_ids = [
             item["snippet"]["resourceId"]["videoId"]
-            for item in google_test.get_videos_in_playlist(self.youtube, youtube_playlist_id)
+            for item in youtube_api.get_videos_in_playlist(self.youtube, youtube_playlist_id)
             if "snippet" in item and "resourceId" in item["snippet"] and "videoId" in item["snippet"]["resourceId"]
         ]
 
@@ -789,7 +817,7 @@ class Spotify2YTMUI(tk.Tk):
         self.progressbar["value"] = 0
 
         for idx, track in enumerate(tracks, 1):
-            video_id = copy_playlists.search_track_on_ytm(track)
+            video_id = youtube_api.find_song(track)
             if video_id and video_id not in existing_video_ids:
                 ytm_video_ids.append(video_id)
             elif not video_id:
@@ -801,7 +829,7 @@ class Spotify2YTMUI(tk.Tk):
         self.progressbar["value"] = 0
 
         if ytm_video_ids:
-            google_test.add_videos_to_playlist(self.youtube, youtube_playlist_id, ytm_video_ids)
+            youtube_api.add_videos_to_playlist(self.youtube, youtube_playlist_id, ytm_video_ids)
             self.append_response(f"✅ Added {len(ytm_video_ids)} new tracks to: {youtube_playlist_name}")
         else:
             self.append_response(f"ℹ️ No new tracks to add for: {youtube_playlist_name}")
@@ -1456,6 +1484,34 @@ class Spotify2YTMUI(tk.Tk):
         self.progressbar["value"] = current
         self.progress.set(f"Adding tracks: {current}/{total}")
         self.update_idletasks()
+        
+    def new_youtube_playlist(self):
+        name = simpledialog.askstring('New playlist name', 'Enter the new playlist name')
+        if not name.strip():
+            messagebox.showinfo("Invalid Name", "Please enter a valid title.")
+            return
+        
+        youtube_api.create_playlist(self.youtube, name)
+        while True:
+            time.sleep(.5)
+            playlists = [
+                playlist["snippet"]["title"]
+                for playlist in youtube_api.get_playlists(self.youtube)
+                if "snippet" in playlist and "title" in playlist["snippet"]
+            ]
+            if name in playlists:
+                break
+        threading.Thread(target=self.load_youtube_playlists).start()
+        
+    def delete_youtube_playlist(self):
+        playlist_id = self.youtube_playlists[self.youtube_selected_index]['id']
+        print(playlist_id)
+        return
+    
+    def clear_youtube_playlist(self):
+        print(self.youtube_playlists[self.youtube_selected_index])
+        return
+
         
 if __name__ == "__main__":
     config = load_config()
